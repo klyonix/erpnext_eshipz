@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-05-21 15:27:04.148005",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "api_token",
+  "column_break_norm",
+  "enable_allocation"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enable_allocation",
+   "fieldtype": "Check",
+   "label": "Enable Allocation"
+  },
+  {
+   "depends_on": "eval:doc.enabled==1",
+   "fieldname": "api_token",
+   "fieldtype": "Data",
+   "label": "API Token"
+  },
+  {
+   "fieldname": "column_break_norm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enable"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-05-21 22:04:22.436125",
+ "modified_by": "Administrator",
+ "module": "Erpnext Eshipz",
+ "name": "eShipz Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
