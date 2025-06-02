@@ -47,6 +47,13 @@ app_license = "mit"
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
+doctype_js = {
+    "Shipment" : "erpnext_eshipz/custom/shipment/shipment.js",
+    "Sales Invoice" : "erpnext_eshipz/custom/sales_invoice/sales_invoice.js",
+    "Delivery Note" : "erpnext_eshipz/custom/delivery_note/delivery_note.js",
+    "Stock Entry" : "erpnext_eshipz/custom/stock_entry/stock_entry.js"
+}
+
 
 # Svg Icons
 # ------------------
@@ -144,6 +151,11 @@ app_license = "mit"
 # 		"on_trash": "method"
 # 	}
 # }
+doc_events = {
+    "Sales Invoice": {
+        "before_submit": "erpnext_eshipz.erpnext_eshipz.custom.sales_invoice.sales_invoice.update_delivery_note"
+    }
+}
 
 # Scheduled Tasks
 # ---------------
