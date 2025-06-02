@@ -1,0 +1,64 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-05-13 11:43:00.256976",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "receiver_party_type",
+  "receiver_name",
+  "receiver_email",
+  "receiver_contact",
+  "address"
+ ],
+ "fields": [
+  {
+   "fieldname": "receiver_party_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Receiver Party Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "receiver_name",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Receiver Name",
+   "options": "receiver_party_type"
+  },
+  {
+   "fieldname": "receiver_email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Receiver Email"
+  },
+  {
+   "fieldname": "receiver_contact",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Receiver Contact",
+   "options": "Contact"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Link",
+   "label": "Address",
+   "options": "Address"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-05-13 12:51:30.213698",
+ "modified_by": "Administrator",
+ "module": "Erpnext Eshipz",
+ "name": "Group Shipment Table",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
