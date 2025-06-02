@@ -4,3 +4,8 @@
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
+
+
+erpnext_eshipz.erpnext_eshipz.patches.shipment_delivery_note 
+erpnext_eshipz.erpnext_eshipz.patches.shipment
+erpnext_eshipz.erpnext_eshipz.patches.shipment_autoname
