@@ -63,3 +63,5 @@ def execute():
     }
     create_custom_fields(custom_field)
     make_property_setter("Batch", "expiry_date", "reqd", 1, "Check")
+    make_property_setter("Shipment", "description_of_content", "default", "Medicine", "Small Text")
+    make_property_setter("Shipment", "pickup_date", "default", "Today", "Small Text")
