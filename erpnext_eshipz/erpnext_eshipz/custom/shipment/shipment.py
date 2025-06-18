@@ -124,14 +124,13 @@ def fetch_available_services(docname):
             ]
         }
     }
-    frappe.errprint(f"data {data}")
+
     json_data = json.dumps(data, separators=(',', ':'), default=lambda x: str(x).lower() if isinstance(x, bool) else x)
 
     response = requests.post(url, headers=headers, data=json_data)
 
     if response.status_code == 200:
         result = response.json()
-        frappe.errprint(f"result {result}")
         if 'rates' in result['data']:
             rates_list = result['data']['rates']
             if rates_list:
@@ -764,7 +763,6 @@ def create_shipment(docname, selected_service, item_data=None):
 
     if response.status_code == 200:
         result = response.json()
-        frappe.errprint(f"Result here {result}")
         if 'files' in result['data']:
             label_url = result['data']['files']['label']['label_meta']['url']
             awb_number = result['data']['files']['label']['label_meta']['awb']
