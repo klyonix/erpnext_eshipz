@@ -7,6 +7,7 @@
  "field_order": [
   "enabled",
   "api_token",
+  "enable_automatic_parcel_allocation",
   "column_break_norm",
   "enable_allocation"
  ],
@@ -32,13 +33,20 @@
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enable"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enabled==1",
+   "fieldname": "enable_automatic_parcel_allocation",
+   "fieldtype": "Check",
+   "label": "Enable Automatic Parcel Allocation"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-05-21 22:04:22.436125",
+ "modified": "2025-06-18 11:31:20.677933",
  "modified_by": "Administrator",
  "module": "Erpnext Eshipz",
  "name": "eShipz Settings",
