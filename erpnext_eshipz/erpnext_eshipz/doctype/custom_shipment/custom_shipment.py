@@ -600,7 +600,7 @@ def create_single_shipment(docname, receiver_idx, service_data, item_data):
             "unit": "KG",
             "value": receiver_row.weight
         },
-        "customer_reference": f"{doc.name}-{receiver_idx}-012",
+        "customer_reference": f"{doc.name}-{receiver_idx}",
         "invoice_number": " ",
         "invoice_date": " ",
         "is_reverse": False,
