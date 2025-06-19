@@ -1,4 +1,4 @@
-# Copyright (c) 2024, Frutter Software Labs Private Limited and contributors
+# Copyright (c) 2024, KlyONIX Tech Consulting Pvt Ltd and contributors
 # For license information, please see license.txt
 
 import frappe
@@ -9,7 +9,7 @@ def execute():
     custom_field = {
         "Shipment": [
             dict(
-                fieldname = "fsl_purpose",
+                fieldname = "kly_purpose",
                 fieldtype = "Select",
                 label = "Purpose",
                 options = "\npersonal\ncommercial\nsample\nreturn\nrepair\ngift",
@@ -18,16 +18,16 @@ def execute():
                 default = "commercial"
             ),
             dict(
-                fieldname = "fsl_pickup_type",
+                fieldname = "kly_pickup_type",
                 fieldtype = "Select",
                 label = "Pickup Type",
                 options = "\nbusiness\nresidential",
-                insert_after = "fsl_purpose",
+                insert_after = "kly_purpose",
                 reqd = 1,
                 default = "business"
             ),
             dict(
-                fieldname = "fsl_delivery_type",
+                fieldname = "kly_delivery_type",
                 fieldtype = "Select",
                 label = "Delivery Type",
                 options = "\nbusiness\nresidential",
@@ -36,25 +36,25 @@ def execute():
                 default = "business"
             ),
             dict(
-                fieldname = "fsl_latest_location",
+                fieldname = "kly_latest_location",
                 fieldtype = "Data",
                 label = "Latest location",
                 insert_after = "tracking_status_info",
             ),
             dict(
-                fieldname = "fsl_expected_delivery_date",
+                fieldname = "kly_expected_delivery_date",
                 fieldtype = "Datetime",
                 label = "Expected Delivery Date",
-                insert_after = "fsl_latest_location",
+                insert_after = "kly_latest_location",
             ),
             dict(
-                fieldname = "fsl_delivery_date",
+                fieldname = "kly_delivery_date",
                 fieldtype = "Datetime",
                 label = "Delivery Date",
-                insert_after = "fsl_expected_delivery_date",
+                insert_after = "kly_expected_delivery_date",
             ),
             dict(
-                fieldname = "fsl_last_update_received",
+                fieldname = "kly_last_update_received",
                 fieldtype = "Datetime",
                 label = "Last Update Received",
                 insert_after = "tracking_url",

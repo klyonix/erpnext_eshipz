@@ -51,7 +51,7 @@ def fetch_available_services(docname):
         "is_document": False,
         "shipment": {
             "is_reverse": False,
-            "purpose": doc.fsl_purpose,
+            "purpose": doc.kly_purpose,
             "is_cod": False,
             "collect_on_delivery": {"amount": 0, "currency": "INR"},
             "ship_from": {
@@ -63,7 +63,7 @@ def fetch_available_services(docname):
                 "state": pickup_address.state,
                 "postal_code": pickup_address.pincode,
                 "country": pickup_country_code,
-                "type": doc.fsl_pickup_type,
+                "type": doc.kly_pickup_type,
                 "phone": pickup_address.phone,
                 "email": pickup_address.email_id,
                 "is_primary": True
@@ -77,7 +77,7 @@ def fetch_available_services(docname):
                 "state": delivery_address.state,
                 "postal_code": delivery_address.pincode,
                 "country": delivery_country_code,
-                "type": doc.fsl_delivery_type,
+                "type": doc.kly_delivery_type,
                 "phone": delivery_address.phone,
                 "email": delivery_address.email_id,
             },
@@ -89,7 +89,7 @@ def fetch_available_services(docname):
                 "state": pickup_address.state,
                 "postal_code": pickup_address.pincode,
                 "country": pickup_country_code,
-                "type": doc.fsl_pickup_type,
+                "type": doc.kly_pickup_type,
                 "phone": pickup_address.phone,
                 "email": pickup_address.email_id,
                 "is_primary": True
@@ -280,7 +280,7 @@ def create_rule_based_shipment(docname, item_data=None):
         "vendor_id": None,
         "description": "Bluedart",
         "slug": None,
-        "purpose": doc.fsl_purpose,
+        "purpose": doc.kly_purpose,
         "order_source": "erpnext",
         "parcel_contents": doc.description_of_content,
         "is_document": False,
@@ -307,7 +307,7 @@ def create_rule_based_shipment(docname, item_data=None):
                 "email": pickup_address.email_id,
                 "tax_id": pickup_address.gstin,
                 "country": pickup_country_code,
-                "type": doc.fsl_pickup_type
+                "type": doc.kly_pickup_type
             },
             "ship_to": {
                 "contact_name": doc.delivery_contact_name,
@@ -320,7 +320,7 @@ def create_rule_based_shipment(docname, item_data=None):
                 "phone": delivery_address.phone,
                 "email": delivery_address.email_id,
                 "country": delivery_country_code,
-                "type": doc.fsl_delivery_type
+                "type": doc.kly_delivery_type
             },
             "return_to": {
                 "contact_name": doc.pickup_contact_person,
@@ -334,7 +334,7 @@ def create_rule_based_shipment(docname, item_data=None):
                 "email": pickup_address.email_id,
                 "tax_id": pickup_address.gstin,
                 "country": pickup_country_code,
-                "type": doc.fsl_pickup_type
+                "type": doc.kly_pickup_type
             },
             "is_reverse": False,
             "is_to_pay": False,
@@ -454,7 +454,7 @@ def update_status(docname):
             latest_remark = latest_checkpoint.get('remark')
             latest_tag = latest_checkpoint.get('tag')
 
-            doc.db_set('fsl_latest_location', latest_city)
+            doc.db_set('kly_latest_location', latest_city)
 
         if tag == "Delivered":
             doc.db_set('status', "Completed")
@@ -464,26 +464,26 @@ def update_status(docname):
 
         if delivery_date:
             delivery_date_erp = datetime.strptime(delivery_date, "%a, %d %b %Y %H:%M:%S %Z").strftime("%Y-%m-%d %H:%M:%S")
-            doc.db_set('fsl_delivery_date', delivery_date_erp)
+            doc.db_set('kly_delivery_date', delivery_date_erp)
 
         if expected_delivery_date:
             expected_delivery_date_erp = datetime.strptime(expected_delivery_date, "%a, %d %b %Y %H:%M:%S %Z").strftime("%Y-%m-%d %H:%M:%S")
-            doc.db_set('fsl_expected_delivery_date', expected_delivery_date_erp)
+            doc.db_set('kly_expected_delivery_date', expected_delivery_date_erp)
 
         last_update_received = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        doc.db_set('fsl_last_update_received', last_update_received)
+        doc.db_set('kly_last_update_received', last_update_received)
         doc.db_set('tracking_status_info', latest_remark)
         frappe.db.commit()
 
         return {
             "latest_checkpoint": {
-                "fsl_latest_location": latest_city,
+                "kly_latest_location": latest_city,
                 "remark": latest_remark,
                 "tag": latest_tag
             },
             "tracking_status_info": latest_remark,
-            "fsl_delivery_date": delivery_date_erp if delivery_date else None,
-            "fsl_expected_delivery_date": expected_delivery_date_erp if expected_delivery_date else None,
+            "kly_delivery_date": delivery_date_erp if delivery_date else None,
+            "kly_expected_delivery_date": expected_delivery_date_erp if expected_delivery_date else None,
             "shipment_status": shipment_status,
             "tag": tag,
         }
@@ -694,7 +694,7 @@ def create_shipment(docname, selected_service, item_data=None):
         "vendor_id": selected_service['vendor_id'],
         "description": selected_service['description'],
         "slug": selected_service['slug'],
-        "purpose": doc.fsl_purpose,
+        "purpose": doc.kly_purpose,
         "order_source": "erpnext",
         "parcel_contents": doc.description_of_content,
         "is_document": False,
@@ -721,7 +721,7 @@ def create_shipment(docname, selected_service, item_data=None):
                 "email": pickup_address.email_id,
                 "tax_id": pickup_address.gstin,
                 "country": pickup_country_code,
-                "type": doc.fsl_pickup_type
+                "type": doc.kly_pickup_type
             },
             "ship_to": {
                 "contact_name": doc.delivery_contact_name,
@@ -734,7 +734,7 @@ def create_shipment(docname, selected_service, item_data=None):
                 "phone": delivery_address.phone,
                 "email": delivery_address.email_id,
                 "country": delivery_country_code,
-                "type": doc.fsl_delivery_type
+                "type": doc.kly_delivery_type
             },
             "return_to": {
                 "contact_name": doc.pickup_contact_person,
@@ -748,7 +748,7 @@ def create_shipment(docname, selected_service, item_data=None):
                 "email": pickup_address.email_id,
                 "tax_id": pickup_address.gstin,
                 "country": pickup_country_code,
-                "type": doc.fsl_pickup_type
+                "type": doc.kly_pickup_type
             },
             "is_reverse": False,
             "is_to_pay": False,
