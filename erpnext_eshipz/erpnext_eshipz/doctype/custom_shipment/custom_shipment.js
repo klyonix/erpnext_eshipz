@@ -152,54 +152,77 @@ frappe.ui.form.on("Custom Shipment", {
     },
 
     // Fetch and populate receiver_details based on filters
-    apply_filter: function (frm) {
-        const { filter_doctype, sub_filter, value } = frm.doc;
+    apply_filter: function(frm) {
+    const { filter_doctype, sub_filter, value } = frm.doc;
 
-        if (!filter_doctype) {
-            frappe.msgprint("Please select Filter Doctype.");
-            return;
-        }
+    if (!filter_doctype) {
+        frappe.msgprint("Please select Filter Doctype.");
+        return;
+    }
 
-        frappe.show_progress("Applying Filter", 30, 100, "Fetching records...");
+    // Build filters
+    const filters = {};
+    const fieldname = frm.__link_field_map?.[sub_filter];
+    
+    if (sub_filter && value && fieldname) {
+        filters[fieldname] = value;
+    }
 
-        const args = {
+    // Single optimized call to backend
+    frappe.call({
+        method: 'erpnext_eshipz.erpnext_eshipz.doctype.custom_shipment.custom_shipment.get_filtered_records_with_addresses',
+        args: {
             doctype: filter_doctype,
-            fields: ["name"],
-        };
-
-        const fieldname = frm.__link_field_map?.[sub_filter];
-
-        if (sub_filter && value && fieldname) {
-            args.filters = { [fieldname]: value };
+            filters: filters
+        },
+        freeze: true,
+        freeze_message: __('Fetching records...'),
+        callback: function(response) {
+            if (response.message) {
+                process_records(frm, response.message);
+            } else {
+                frappe.msgprint(__('No records found matching the criteria'));
+            }
+        },
+        error: function() {
+            frappe.msgprint(__('Failed to fetch records'));
         }
+    });
+    
+    function process_records(frm, records) {
+        frm.clear_table("receiver_details");
 
-        frappe.call({
-            method: "frappe.client.get_list",
-            args: args,
-            callback: function (response) {
-                const data = response.message || [];
-                frm.clear_table("receiver_details");
-
-                data.forEach(row => {
-                    const child = frm.add_child("receiver_details");
-                    child.receiver_party_type = filter_doctype;
-                    child.receiver_name = row.name;
-                });
-
-                frm.refresh_field("receiver_details");
-                frappe.hide_progress();
-
-                const btn = frm.page.inner_toolbar.find('.btn-add-parcel-template');
-                if (btn) {
-                    btn.prop('disabled', data.length === 0);
-                }
-            },
-            error: function () {
-                frappe.hide_progress();
-                frappe.msgprint("Failed to fetch records.");
+        records.forEach(row => {
+            const child = frm.add_child("receiver_details");
+            child.receiver_party_type = frm.doc.filter_doctype;
+            child.receiver_name = row.name;
+            
+            // Add address details if available
+            if (row.address) {
+                child.address = row.address.name;
+                child.address_line_1 = row.address.address_line1;
+                child.address_line_2 = row.address.address_line2;
+                child.city = row.address.city;
+                child.state = row.address.state;
+                child.postal_code = row.address.pincode;
+                child.country = row.address.country;
+            }
+            
+            // Add contact details if available
+            if (row.contact) {
+                child.receiver_contact = row.contact.phone || row.contact.mobile_no;
+                child.receiver_email = row.contact.email_id;
             }
         });
-    },
+
+        frm.refresh_field("receiver_details");
+
+        const btn = frm.page.inner_toolbar.find('.btn-add-parcel-template');
+        if (btn) {
+            btn.prop('disabled', records.length === 0);
+        }
+    }
+},
 
     // Dialog to enter parcel template info
     open_parcel_template_dialog: function (frm) {
