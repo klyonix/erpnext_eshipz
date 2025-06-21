@@ -8,6 +8,7 @@ from collections import defaultdict
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import cint
 
 
 class CustomShipment(Document):
@@ -120,14 +121,41 @@ def get_filtered_records_with_addresses(doctype, filters):
 
 @frappe.whitelist()
 def fetch_available_services(docname):
+    # Get main document in one query
     doc = frappe.get_doc('Custom Shipment', docname)
-    pickup_address = frappe.get_doc('Address', doc.address)
     
-    def get_country_code(country_name):
-        country = frappe.get_doc('Country', country_name)
-        return country.code.upper()
+    # Optimize address fetching - get all receiver addresses in one query
+    receiver_addresses = {r.address: r for r in doc.receiver_details}
+    address_names = [doc.address] + list(receiver_addresses.keys())
+    
+    # Get all addresses in one query
+    addresses = frappe.db.sql(f"""
+        SELECT name, address_line1, address_line2, city, state, pincode, country, phone, email_id
+        FROM `tabAddress`
+        WHERE name IN ({','.join(['%s']*len(address_names))})
+    """, address_names, as_dict=1)
+    
+    # Create address mapping
+    address_map = {a.name: a for a in addresses}
+    pickup_address = address_map.get(doc.address)
+    if not pickup_address:
+        frappe.throw("Pickup address not found")
+    
+    # Get country codes in one query
+    country_names = {pickup_address.country}
+    for addr in receiver_addresses.values():
+        country_names.add(address_map.get(addr.address, {}).get('country'))
+    
+    countries = frappe.db.sql(f"""
+        SELECT name, code FROM `tabCountry`
+        WHERE name IN ({','.join(['%s']*len(country_names))})
+    """, list(country_names), as_dict=1)
+    country_code_map = {c.name: c.code.upper() for c in countries}
+    
+    pickup_country_code = country_code_map.get(pickup_address.country)
+    if not pickup_country_code:
+        frappe.throw("Country code not found for pickup address")
 
-    pickup_country_code = get_country_code(pickup_address.country)
     if doc.type == "Bulk Shipment":
         api_token = frappe.db.get_single_value('eShipz Settings', 'api_token')
         if not api_token:
@@ -141,9 +169,14 @@ def fetch_available_services(docname):
 
         all_services = []
         
-        for receiver in doc.get("receiver_details"):
-            delivery_address = frappe.get_doc('Address', receiver.address)
-            delivery_country_code = get_country_code(delivery_address.country)
+        for receiver in doc.receiver_details:
+            delivery_address = address_map.get(receiver.address)
+            if not delivery_address:
+                continue
+                
+            delivery_country_code = country_code_map.get(delivery_address.country)
+            if not delivery_country_code:
+                continue
             
             data = {    
                 "is_document": False,
@@ -223,12 +256,12 @@ def fetch_available_services(docname):
                 }
             }
             
-            json_data = json.dumps(data, separators=(',', ':'), default=lambda x: str(x).lower() if isinstance(x, bool) else x)
-            response = requests.post(url, headers=headers, data=json_data)
-
-            if response.status_code == 200:
+            try:
+                response = requests.post(url, headers=headers, json=data)
+                response.raise_for_status()
                 result = response.json()
-                if 'rates' in result['data']:
+                
+                if 'rates' in result.get('data', {}):
                     rates_list = result['data']['rates']
                     if rates_list:
                         services = [rate for rate in rates_list if rate.get('code') in [200, 201]]
@@ -236,17 +269,18 @@ def fetch_available_services(docname):
                             service['receiver_name'] = receiver.receiver_name
                             service['receiver_idx'] = receiver.idx
                         all_services.extend(services)
-                else:
-                    frappe.throw("Rates key not found in API response: " + frappe.as_json(result))
-            else:
-                frappe.throw("Failed to fetch services: " + response.text)
+            except Exception as e:
+                frappe.log_error(f"Failed to fetch services for receiver {receiver.idx}: {str(e)}")
+                continue
         
         return all_services
 
 @frappe.whitelist()
 def fetch_single_available_services(docname):
     doc = frappe.get_doc('Custom Shipment', docname)
-    pickup_address = frappe.get_doc('Address', doc.address)
+    pickup_address = frappe.db.get_value('Address', doc.address, 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        as_dict=1)
     
     def get_country_code(country_name):
         country = frappe.get_doc('Country', country_name)
@@ -370,7 +404,9 @@ def create_shipment(docname, selected_service, item_data=None):
     if item_data:
         item_data = json.loads(item_data)
 
-    pickup_address = frappe.get_doc('Address', doc.address)
+    pickup_address = frappe.db.get_value('Address', doc.address, 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        as_dict=1)
     
     def get_country_code(country_name):
         country = frappe.get_doc('Country', country_name)
@@ -627,7 +663,9 @@ def create_single_shipment(docname, receiver_idx, service_data, item_data):
     Create a single shipment for a receiver
     """
     doc = frappe.get_doc("Custom Shipment", docname)
-    pickup_address = frappe.get_doc('Address', doc.address)
+    pickup_address = frappe.db.get_value('Address', doc.address, 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        as_dict=1)
     
     # Find the receiver row
     receiver_row = None
@@ -639,7 +677,9 @@ def create_single_shipment(docname, receiver_idx, service_data, item_data):
     if not receiver_row:
         frappe.throw(f"Receiver with idx {receiver_idx} not found")
     
-    delivery_address = frappe.get_doc('Address', receiver_row.address)
+    delivery_address = frappe.db.get_value('Address', receiver_row.address, 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        as_dict=1)
     
     def get_country_code(country_name):
         country = frappe.get_doc('Country', country_name)
@@ -784,92 +824,6 @@ def create_single_shipment(docname, receiver_idx, service_data, item_data):
         error_msg = response.json().get("msg", response.text)
         frappe.log_error(f"API Failed for {receiver_row.receiver_name} with {response.status_code}: {error_msg}")
         frappe.throw(f"API request failed with status {response.status_code}: {error_msg}")
-
-
-@frappe.whitelist()
-def update_status(docname):
-
-    doc = frappe.get_doc('Custom Shipment', docname)
-
-    api_token = frappe.db.get_single_value('eShipz Settings', 'api_token')
-    if not api_token:
-        frappe.throw("API token not found in eShipz Settings")
-
-    url = "https://app.eshipz.com/api/v2/trackings"
-    headers = {
-        "X-API-TOKEN": api_token,
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "track_id": doc.awb_number
-    }
-
-    response = requests.post(url, headers=headers, json=data)
-    
-    if response.status_code == 200:
-        result = response.json()
-        if not result:
-            frappe.throw("API response is empty")
-
-        if not isinstance(result, list):
-            frappe.throw("API response format is not a list: " + frappe.as_json(result))
-
-        tracking_data = result[0] if result else None
-        if not tracking_data or 'checkpoints' not in tracking_data:
-            frappe.throw("Invalid tracking data format: " + frappe.as_json(result))
-
-        checkpoints = tracking_data.get('checkpoints', [])
-        delivery_date = tracking_data.get('delivery_date')
-        expected_delivery_date = tracking_data.get('expected_delivery_date')
-        shipment_status = tracking_data.get('shipment_status')
-        tag = tracking_data.get('tag')
-
-        latest_city = None
-        latest_remark = None
-        latest_tag = None
-
-        if checkpoints:
-            latest_checkpoint = sorted(checkpoints, key=lambda x: datetime.strptime(x['date'], "%a, %d %b %Y %H:%M:%S %Z"), reverse=True)[0]
-            latest_city = latest_checkpoint.get('city')
-            latest_remark = latest_checkpoint.get('remark')
-            latest_tag = latest_checkpoint.get('tag')
-
-            doc.db_set('latest_location', latest_city)
-
-        if tag == "Delivered":
-            doc.db_set('status', "Completed")
-            doc.db_set('tracking_status', "Delivered")
-        elif tag == "InTransit":
-            doc.db_set('tracking_status', "In Progress")
-
-        if delivery_date:
-            delivery_date_erp = datetime.strptime(delivery_date, "%a, %d %b %Y %H:%M:%S %Z").strftime("%Y-%m-%d %H:%M:%S")
-            doc.db_set('delivery_date', delivery_date_erp)
-
-        if expected_delivery_date:
-            expected_delivery_date_erp = datetime.strptime(expected_delivery_date, "%a, %d %b %Y %H:%M:%S %Z").strftime("%Y-%m-%d %H:%M:%S")
-            doc.db_set('expected_delivery_date', expected_delivery_date_erp)
-
-        last_update_received = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        doc.db_set('last_update_received', last_update_received)
-        doc.db_set('tracking_status_info', latest_remark)
-        frappe.db.commit()
-
-        return {
-            "latest_checkpoint": {
-                "latest_location": latest_city,
-                "remark": latest_remark,
-                "tag": latest_tag
-            },
-            "tracking_status_info": latest_remark,
-            "delivery_date": delivery_date_erp if delivery_date else None,
-            "expected_delivery_date": expected_delivery_date_erp if expected_delivery_date else None,
-            "shipment_status": shipment_status,
-            "tag": tag,
-        }
-    else:
-        frappe.throw("Failed to retrieve shipment status: " + response.text)
 
 
 @frappe.whitelist()
