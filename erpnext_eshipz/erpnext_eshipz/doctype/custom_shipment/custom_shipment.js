@@ -1174,6 +1174,7 @@ function process_shipment_creation(selected_services) {
     let shipments_data = selected_services.map(service => {
         let receiver_row = cur_frm.doc.receiver_details.find(r => r.idx == service.receiver_idx);
         return {
+            child_name: receiver_row.name,
             receiver_idx: service.receiver_idx,
             receiver_name: service.receiver_name,
             service_data: service.service,
