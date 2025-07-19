@@ -40,80 +40,88 @@ def validation_of_shipment(self, method):
 def get_filtered_records_with_addresses(doctype, filters):
     """Fetch records with their addresses and contacts in optimized queries"""
     
-    # Get main records - no limit since we're doing server-side processing
-    records = frappe.get_list(
-        doctype,
-        fields=["name"],
-        filters=filters,
-        order_by="name"
-    )
-    
-    if not records:
+    # Validate input
+    if not doctype or not filters:
         return []
-    
-    record_names = [r["name"] for r in records]
-    
-    # Get all addresses linked to these records
-    address_data = frappe.db.sql("""
-        SELECT 
-            dl.link_name as record_name,
-            addr.name
-        FROM `tabAddress` addr
-        JOIN `tabDynamic Link` dl ON addr.name = dl.parent
-        WHERE 
-            dl.link_doctype = %(doctype)s AND
-            dl.link_name IN %(record_names)s AND
-            dl.parenttype = 'Address'
-        ORDER BY addr.is_primary_address DESC, addr.modified DESC
-    """, {
-        "doctype": doctype,
-        "record_names": record_names
-    }, as_dict=True)
-    
-    # Get all contacts linked to these records
-    contact_data = frappe.db.sql("""
-        SELECT 
-            dl.link_name as record_name,
-            contact.name, contact.email_id, contact.phone, contact.mobile_no
-        FROM `tabContact` contact
-        JOIN `tabDynamic Link` dl ON contact.name = dl.parent
-        WHERE 
-            dl.link_doctype = %(doctype)s AND
-            dl.link_name IN %(record_names)s AND
-            dl.parenttype = 'Contact'
-        ORDER BY contact.is_primary_contact DESC, contact.modified DESC
-    """, {
-        "doctype": doctype,
-        "record_names": record_names
-    }, as_dict=True)
-    
-    # Organize addresses and contacts by record name
-    addresses_by_record = {}
-    for addr in address_data:
-        if addr.record_name not in addresses_by_record:
-            addresses_by_record[addr.record_name] = addr
-    
-    contacts_by_record = {}
-    for contact in contact_data:
-        if contact.record_name not in contacts_by_record:
-            contacts_by_record[contact.record_name] = contact
-    
-    # Combine all data
-    result = []
-    for record in records:
-        record_data = {"name": record["name"]}
+
+    try:
+        # Parse filters if they're in JSON string format
+        if isinstance(filters, str):
+            filters = json.loads(filters)
+
+        # Get main records - add limit for safety
+        records = frappe.get_list(
+            doctype,
+            fields=["name"],
+            filters=filters,
+            order_by="name",
+        )
         
-        # Add address if exists
-        if record["name"] in addresses_by_record:
-            record_data["address"] = addresses_by_record[record["name"]]
+        if not records:
+            return []
+        
+        record_names = [r["name"] for r in records]
+        
+        # Get all addresses linked to these records in one query
+        address_data = frappe.db.sql("""
+            SELECT 
+                dl.link_name as record_name,
+                addr.name, addr.address_line1, addr.address_line2, 
+                addr.city, addr.state, addr.pincode, addr.country
+            FROM `tabAddress` addr
+            JOIN `tabDynamic Link` dl ON addr.name = dl.parent
+            WHERE 
+                dl.link_doctype = %(doctype)s AND
+                dl.link_name IN %(record_names)s AND
+                dl.parenttype = 'Address'
+            ORDER BY addr.is_primary_address DESC, addr.modified DESC
+        """, {
+            "doctype": doctype,
+            "record_names": record_names
+        }, as_dict=True)
+        
+        # Get all contacts linked to these records in one query
+        contact_data = frappe.db.sql("""
+            SELECT 
+                dl.link_name as record_name,
+                contact.name, contact.email_id, 
+                COALESCE(contact.mobile_no, contact.phone) as phone
+            FROM `tabContact` contact
+            JOIN `tabDynamic Link` dl ON contact.name = dl.parent
+            WHERE 
+                dl.link_doctype = %(doctype)s AND
+                dl.link_name IN %(record_names)s AND
+                dl.parenttype = 'Contact'
+            ORDER BY contact.is_primary_contact DESC, contact.modified DESC
+        """, {
+            "doctype": doctype,
+            "record_names": record_names
+        }, as_dict=True)
+        
+        # Organize addresses and contacts by record name
+        addresses_by_record = defaultdict(list)
+        for addr in address_data:
+            addresses_by_record[addr.record_name].append(addr)
             
-        # Add contact if exists
-        if record["name"] in contacts_by_record:
-            record_data["contact"] = contacts_by_record[record["name"]]
-            
-        result.append(record_data)
-    
-    return result
+        contacts_by_record = defaultdict(list)
+        for contact in contact_data:
+            contacts_by_record[contact.record_name].append(contact)
+        
+        # Combine all data
+        result = []
+        for record in records:
+            record_data = {
+                "name": record["name"],
+                "addresses": addresses_by_record.get(record["name"], []),
+                "contacts": contacts_by_record.get(record["name"], [])
+            }
+            result.append(record_data)
+        
+        return result
+        
+    except Exception as e:
+        frappe.log_error(f"Error in get_filtered_records_with_addresses: {str(e)}")
+        return []
 
 
 @frappe.whitelist()

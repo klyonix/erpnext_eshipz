@@ -26,11 +26,20 @@
   "country_code",
   "contact",
   "email_id",
+  "bulk_shipment_filters_section",
   "filter_doctype",
   "sub_filter",
+  "sub_filter_2",
+  "sub_filter_3",
   "dynamic_link_ref",
-  "value",
+  "dynamic_link_ref_3",
   "apply_filter",
+  "column_break_qmek",
+  "dummy",
+  "value",
+  "value_2",
+  "value_3",
+  "dynamic_link_ref_2",
   "parcel_section",
   "column_break_zjjo",
   "shipment_parcel",
@@ -377,7 +386,7 @@
    "depends_on": "eval:doc.type==\"Bulk Shipment\";",
    "fieldname": "sub_filter",
    "fieldtype": "Select",
-   "label": "Sub Filter"
+   "label": "Sub Filter 1"
   },
   {
    "depends_on": "eval:doc.type==\"Bulk Shipment\";",
@@ -397,7 +406,7 @@
    "depends_on": "eval:doc.type==\"Bulk Shipment\";",
    "fieldname": "value",
    "fieldtype": "Dynamic Link",
-   "label": "Value",
+   "label": "Value 1",
    "options": "dynamic_link_ref"
   },
   {
@@ -492,13 +501,73 @@
    "fieldtype": "Data",
    "label": "Latest Location",
    "read_only": 1
+  },
+  {
+   "fieldname": "bulk_shipment_filters_section",
+   "fieldtype": "Section Break",
+   "label": "Bulk Shipment Filters"
+  },
+  {
+   "depends_on": "eval:doc.type==\"Bulk Shipment\";",
+   "fieldname": "sub_filter_2",
+   "fieldtype": "Select",
+   "label": "Sub Filter 2"
+  },
+  {
+   "depends_on": "eval:doc.type==\"Bulk Shipment\";",
+   "fieldname": "value_2",
+   "fieldtype": "Dynamic Link",
+   "label": "Value 2",
+   "options": "dynamic_link_ref_2"
+  },
+  {
+   "depends_on": "eval:doc.type==\"Bulk Shipment\";",
+   "fieldname": "sub_filter_3",
+   "fieldtype": "Select",
+   "label": "Sub Filter 3"
+  },
+  {
+   "depends_on": "eval:doc.type==\"Bulk Shipment\";",
+   "fieldname": "value_3",
+   "fieldtype": "Dynamic Link",
+   "label": "Value 3",
+   "options": "dynamic_link_ref_3"
+  },
+  {
+   "fieldname": "dynamic_link_ref_2",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Dynamic Link Ref 2",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "dynamic_link_ref_3",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Dynamic Link Ref 3",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_qmek",
+   "fieldtype": "Column Break"
+  },
+  {
+   "bold": 1,
+   "default": "Apply Sub Filters for precise results",
+   "depends_on": "eval:doc.type==\"Bulk Shipment\";",
+   "fieldname": "dummy",
+   "fieldtype": "Data",
+   "print_hide": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-06-19 12:47:03.701081",
+ "modified": "2025-07-14 16:08:36.113755",
  "modified_by": "Administrator",
  "module": "Erpnext Eshipz",
  "name": "Custom Shipment",
