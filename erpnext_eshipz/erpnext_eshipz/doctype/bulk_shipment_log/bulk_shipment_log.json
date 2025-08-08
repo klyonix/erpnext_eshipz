@@ -1,0 +1,272 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format: {parent_doctype_name}-{child_table_row}",
+ "creation": "2025-06-24 14:06:39.181387",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "parent_doctype_name",
+  "child_table_row",
+  "section_break_gchh",
+  "receiver_party_type",
+  "receiver_name",
+  "address",
+  "shipment_parcel_section",
+  "lengths",
+  "width",
+  "height",
+  "weight",
+  "count",
+  "shipment_information_section",
+  "column_break_asgk",
+  "service_provider",
+  "shipment_id",
+  "shipment_amount",
+  "status",
+  "tracking_url",
+  "last_update_received",
+  "column_break_qvjt",
+  "carrier",
+  "carrier_service",
+  "awb_number",
+  "tracking_status",
+  "tracking_status_info",
+  "latest_location",
+  "expected_delivery_date",
+  "delivery_date"
+ ],
+ "fields": [
+  {
+   "fieldname": "receiver_party_type",
+   "fieldtype": "Link",
+   "label": "Receiver Party Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "receiver_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Receiver Name",
+   "options": "receiver_party_type"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Link",
+   "label": "Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "shipment_parcel_section",
+   "fieldtype": "Section Break",
+   "label": "Shipment Parcel"
+  },
+  {
+   "fieldname": "lengths",
+   "fieldtype": "Int",
+   "label": "Length (cm)"
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Int",
+   "label": "Width (cm)"
+  },
+  {
+   "fieldname": "weight",
+   "fieldtype": "Float",
+   "label": "Weight (kg)"
+  },
+  {
+   "fieldname": "count",
+   "fieldtype": "Int",
+   "label": "Count"
+  },
+  {
+   "fieldname": "height",
+   "fieldtype": "Int",
+   "label": "Height (cm)"
+  },
+  {
+   "fieldname": "shipment_information_section",
+   "fieldtype": "Section Break",
+   "label": "Shipment Information"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "service_provider",
+   "fieldtype": "Data",
+   "label": "Service Provider",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "shipment_id",
+   "fieldtype": "Data",
+   "label": "Shipment ID",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "shipment_amount",
+   "fieldtype": "Currency",
+   "label": "Shipment Amount",
+   "no_copy": 1,
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "no_copy": 1,
+   "options": "\nDraft\nSubmitted\nBooked\nCancelled\nCompleted",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "tracking_url",
+   "fieldtype": "Small Text",
+   "label": "Tracking URL",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "carrier",
+   "fieldtype": "Data",
+   "label": "Carrier",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "carrier_service",
+   "fieldtype": "Data",
+   "label": "Carrier Service",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "awb_number",
+   "fieldtype": "Data",
+   "label": "AWB Number",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "tracking_status",
+   "fieldtype": "Select",
+   "label": "Tracking Status",
+   "no_copy": 1,
+   "options": "\nIn Progress\nDelivered\nReturned\nLost",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "tracking_status_info",
+   "fieldtype": "Data",
+   "label": "Tracking Status Info",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "column_break_qvjt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "lengths",
+   "fieldtype": "Int",
+   "label": "Length (cm)"
+  },
+  {
+   "fieldname": "column_break_asgk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "last_update_received",
+   "fieldtype": "Datetime",
+   "label": "Last Update Received",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "latest_location",
+   "fieldtype": "Data",
+   "label": "Latest Location",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "expected_delivery_date",
+   "fieldtype": "Datetime",
+   "label": "Expected Delivery Date",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "delivery_date",
+   "fieldtype": "Datetime",
+   "label": "Delivery Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "parent_doctype_name",
+   "fieldtype": "Link",
+   "label": "Parent Doctype Name",
+   "options": "Custom Shipment"
+  },
+  {
+   "fieldname": "section_break_gchh",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "child_table_row",
+   "fieldtype": "Data",
+   "label": "Child Table Row"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-06-24 14:41:36.178794",
+ "modified_by": "Administrator",
+ "module": "Erpnext Eshipz",
+ "name": "Bulk Shipment Log",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -157,7 +157,8 @@ doc_events = {
     },
     "Custom Shipment":
     {
-        "before_save": "erpnext_eshipz.erpnext_eshipz.doctype.custom_shipment.custom_shipment.validation_of_shipment"
+        "before_submit": "erpnext_eshipz.erpnext_eshipz.doctype.custom_shipment.custom_shipment.validation_of_shipment",
+        "on_update": "erpnext_eshipz.erpnext_eshipz.doctype.custom_shipment.custom_shipment.bg_log"
     }
 }
 
