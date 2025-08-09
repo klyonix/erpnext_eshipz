@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "format:ECS-{YY}-{#####}",
  "creation": "2025-05-13 11:53:10.854141",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -567,10 +568,11 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-07-14 16:08:36.113755",
+ "modified": "2025-08-09 11:52:54.805566",
  "modified_by": "Administrator",
  "module": "Erpnext Eshipz",
  "name": "Custom Shipment",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

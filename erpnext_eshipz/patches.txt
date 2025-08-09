@@ -7,6 +7,6 @@
 
 
 erpnext_eshipz.erpnext_eshipz.patches.shipment_delivery_note 
-erpnext_eshipz.erpnext_eshipz.patches.shipment #1
+erpnext_eshipz.erpnext_eshipz.patches.shipment #2
 erpnext_eshipz.erpnext_eshipz.patches.shipment_autoname
 erpnext_eshipz.erpnext_eshipz.patches.employee
