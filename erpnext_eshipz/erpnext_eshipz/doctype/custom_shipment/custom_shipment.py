@@ -2,10 +2,10 @@
 # For license information, please see license.txt
 
 import json
+import frappe
 import requests
 from datetime import datetime
 from collections import defaultdict
-import frappe
 from frappe import _
 from frappe.model.document import Document
 
@@ -39,89 +39,97 @@ def validation_of_shipment(self, method):
 @frappe.whitelist()
 def get_filtered_records_with_addresses(doctype, filters):
     """Fetch records with their addresses and contacts in optimized queries"""
-    import frappe
-    from frappe.contacts.doctype.address.address import get_address_display
     
-    # Get main records - no limit since we're doing server-side processing
-    records = frappe.get_list(
-        doctype,
-        fields=["name"],
-        filters=filters,
-        order_by="name"
-    )
-    
-    if not records:
+    # Validate input
+    if not doctype or not filters:
         return []
-    
-    record_names = [r["name"] for r in records]
-    
-    # Get all addresses linked to these records
-    address_data = frappe.db.sql("""
-        SELECT 
-            dl.link_name as record_name,
-            addr.name
-        FROM `tabAddress` addr
-        JOIN `tabDynamic Link` dl ON addr.name = dl.parent
-        WHERE 
-            dl.link_doctype = %(doctype)s AND
-            dl.link_name IN %(record_names)s AND
-            dl.parenttype = 'Address'
-        ORDER BY addr.is_primary_address DESC, addr.modified DESC
-    """, {
-        "doctype": doctype,
-        "record_names": record_names
-    }, as_dict=True)
-    
-    # Get all contacts linked to these records
-    contact_data = frappe.db.sql("""
-        SELECT 
-            dl.link_name as record_name,
-            contact.name, contact.email_id, contact.phone, contact.mobile_no
-        FROM `tabContact` contact
-        JOIN `tabDynamic Link` dl ON contact.name = dl.parent
-        WHERE 
-            dl.link_doctype = %(doctype)s AND
-            dl.link_name IN %(record_names)s AND
-            dl.parenttype = 'Contact'
-        ORDER BY contact.is_primary_contact DESC, contact.modified DESC
-    """, {
-        "doctype": doctype,
-        "record_names": record_names
-    }, as_dict=True)
-    
-    # Organize addresses and contacts by record name
-    addresses_by_record = {}
-    for addr in address_data:
-        if addr.record_name not in addresses_by_record:
-            addresses_by_record[addr.record_name] = addr
-    
-    contacts_by_record = {}
-    for contact in contact_data:
-        if contact.record_name not in contacts_by_record:
-            contacts_by_record[contact.record_name] = contact
-    
-    # Combine all data
-    result = []
-    for record in records:
-        record_data = {"name": record["name"]}
+
+    try:
+        # Parse filters if they're in JSON string format
+        if isinstance(filters, str):
+            filters = json.loads(filters)
+
+        # Get main records - add limit for safety
+        records = frappe.get_list(
+            doctype,
+            fields=["name"],
+            filters=filters,
+            order_by="name",
+        )
         
-        # Add address if exists
-        if record["name"] in addresses_by_record:
-            record_data["address"] = addresses_by_record[record["name"]]
+        if not records:
+            return []
+        
+        record_names = [r["name"] for r in records]
+        
+        # Get all addresses linked to these records in one query
+        address_data = frappe.db.sql("""
+            SELECT 
+                dl.link_name as record_name,
+                addr.name, addr.address_line1, addr.address_line2, 
+                addr.city, addr.state, addr.pincode, addr.country
+            FROM `tabAddress` addr
+            JOIN `tabDynamic Link` dl ON addr.name = dl.parent
+            WHERE 
+                dl.link_doctype = %(doctype)s AND
+                dl.link_name IN %(record_names)s AND
+                dl.parenttype = 'Address'
+            ORDER BY addr.is_primary_address DESC, addr.modified DESC
+        """, {
+            "doctype": doctype,
+            "record_names": record_names
+        }, as_dict=True)
+        
+        # Get all contacts linked to these records in one query
+        contact_data = frappe.db.sql("""
+            SELECT 
+                dl.link_name as record_name,
+                contact.name, contact.email_id, 
+                COALESCE(contact.mobile_no, contact.phone) as phone
+            FROM `tabContact` contact
+            JOIN `tabDynamic Link` dl ON contact.name = dl.parent
+            WHERE 
+                dl.link_doctype = %(doctype)s AND
+                dl.link_name IN %(record_names)s AND
+                dl.parenttype = 'Contact'
+            ORDER BY contact.is_primary_contact DESC, contact.modified DESC
+        """, {
+            "doctype": doctype,
+            "record_names": record_names
+        }, as_dict=True)
+        
+        # Organize addresses and contacts by record name
+        addresses_by_record = defaultdict(list)
+        for addr in address_data:
+            addresses_by_record[addr.record_name].append(addr)
             
-        # Add contact if exists
-        if record["name"] in contacts_by_record:
-            record_data["contact"] = contacts_by_record[record["name"]]
-            
-        result.append(record_data)
-    
-    return result
+        contacts_by_record = defaultdict(list)
+        for contact in contact_data:
+            contacts_by_record[contact.record_name].append(contact)
+        
+        # Combine all data
+        result = []
+        for record in records:
+            record_data = {
+                "name": record["name"],
+                "addresses": addresses_by_record.get(record["name"], []),
+                "contacts": contacts_by_record.get(record["name"], [])
+            }
+            result.append(record_data)
+        
+        return result
+        
+    except Exception as e:
+        frappe.log_error(f"Error in get_filtered_records_with_addresses: {str(e)}")
+        return []
 
 
 @frappe.whitelist()
 def fetch_available_services(docname):
     doc = frappe.get_doc('Custom Shipment', docname)
-    pickup_address = frappe.get_doc('Address', doc.address)
+    pickup_address = frappe.db.get_value('Address', doc.address, 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        as_dict=1)
     
     def get_country_code(country_name):
         country = frappe.get_doc('Country', country_name)
@@ -142,7 +150,9 @@ def fetch_available_services(docname):
         all_services = []
         
         for receiver in doc.get("receiver_details"):
-            delivery_address = frappe.get_doc('Address', receiver.address)
+            delivery_address = frappe.db.get_value('Address', receiver.address, 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        as_dict=1)
             delivery_country_code = get_country_code(delivery_address.country)
             
             data = {    
@@ -246,7 +256,9 @@ def fetch_available_services(docname):
 @frappe.whitelist()
 def fetch_single_available_services(docname):
     doc = frappe.get_doc('Custom Shipment', docname)
-    pickup_address = frappe.get_doc('Address', doc.address)
+    pickup_address = frappe.db.get_value('Address', doc.address, 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        as_dict=1)
     
     def get_country_code(country_name):
         country = frappe.get_doc('Country', country_name)
@@ -370,7 +382,9 @@ def create_shipment(docname, selected_service, item_data=None):
     if item_data:
         item_data = json.loads(item_data)
 
-    pickup_address = frappe.get_doc('Address', doc.address)
+    pickup_address = frappe.db.get_value('Address', doc.address,
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        as_dict=1)
     
     def get_country_code(country_name):
         country = frappe.get_doc('Country', country_name)
@@ -532,258 +546,6 @@ def create_shipment(docname, selected_service, item_data=None):
             frappe.throw("Files key not found in API response: " + frappe.as_json(result))
     else:
         frappe.throw("Failed to create shipment: " + response.text)
-
-
-@frappe.whitelist()
-def create_bulk_shipment(docname, shipments_data):
-    """
-    Create shipments for multiple receivers at once and update each receiver row
-    """
-    doc = frappe.get_doc("Custom Shipment", docname)
-    results = []
-    
-    try:
-        shipments_data = json.loads(shipments_data)
-        
-        for shipment in shipments_data:
-            receiver_idx = shipment.get('receiver_idx')
-            service_data = shipment.get('service_data')
-            item_data = shipment.get('item_data', {})
-            
-            try:
-                # Get the receiver detail row
-                receiver_row = None
-                if receiver_idx is not None:
-                    for row in doc.receiver_details:
-                        if row.idx == receiver_idx:
-                            receiver_row = row
-                            break
-                
-                if not receiver_row:
-                    results.append({
-                        'receiver_idx': receiver_idx,
-                        'receiver_name': shipment.get('receiver_name'),
-                        'status': 'Failed',
-                        'error': 'Receiver details not found'
-                    })
-                    continue
-                
-                # Create the shipment - pass docname instead of doc
-                shipment_result = create_single_shipment(
-                    docname=docname,
-                    receiver_idx=receiver_idx,
-                    service_data=service_data,
-                    item_data=item_data
-                )
-                
-                # Update the receiver row with shipment details
-                if shipment_result.get('status') == 'Success':
-                    receiver_row.awb_number = shipment_result.get('awb_number')
-                    receiver_row.service_provider = shipment_result.get('service_provider')
-                    receiver_row.tracking_url = shipment_result.get('tracking_url')
-                    receiver_row.status = 'Booked'
-                    receiver_row.shipment_id = shipment_result.get('shipment_id')
-                
-                results.append({
-                    'receiver_idx': receiver_idx,
-                    'receiver_name': receiver_row.receiver_name,
-                    'status': shipment_result.get('status', 'Failed'),
-                    'awb_number': shipment_result.get('awb_number'),
-                    'service_provider': shipment_result.get('service_provider'),
-                    'tracking_url': shipment_result.get('tracking_url'),
-                    'error': shipment_result.get('error'),
-                    'tracking_status_info': shipment_result.get('tracking_status_info'),
-                    'tracking_status': shipment_result.get('tracking_status'),
-                    'carrier_service': shipment_result.get('carrier_service')
-
-                })
-                
-            except Exception as e:
-                frappe.log_error(f"Failed to create shipment for receiver {receiver_idx}")
-                results.append({
-                    'receiver_idx': receiver_idx,
-                    'receiver_name': shipment.get('receiver_name'),
-                    'status': 'Failed',
-                    'error': str(e)
-                })
-        
-        # Save the document with all updates
-        doc.save()
-        frappe.db.commit()
-        
-        return results
-        
-    except Exception as e:
-        frappe.log_error(f"Bulk shipment creation failed for {docname}")
-        frappe.db.rollback()
-        return [{
-            'status': 'Failed',
-            'error': str(e)
-        }]
-
-@frappe.whitelist()
-def create_single_shipment(docname, receiver_idx, service_data, item_data):
-    """
-    Create a single shipment for a receiver
-    """
-    doc = frappe.get_doc("Custom Shipment", docname)
-    pickup_address = frappe.get_doc('Address', doc.address)
-    
-    # Find the receiver row
-    receiver_row = None
-    for row in doc.receiver_details:
-        if row.idx == receiver_idx:
-            receiver_row = row
-            break
-    
-    if not receiver_row:
-        frappe.throw(f"Receiver with idx {receiver_idx} not found")
-    
-    delivery_address = frappe.get_doc('Address', receiver_row.address)
-    
-    def get_country_code(country_name):
-        country = frappe.get_doc('Country', country_name)
-        return country.code.upper()
-
-    pickup_country_code = get_country_code(pickup_address.country)
-    delivery_country_code = get_country_code(delivery_address.country)
-    
-    api_token = frappe.db.get_single_value('eShipz Settings', 'api_token')
-    if not api_token:
-        frappe.throw("API token not found in eShipz Settings")
-
-    url = "https://app.eshipz.com/api/v1/create-shipments"
-    headers = {
-        "X-API-TOKEN": api_token,
-        "Content-Type": "application/json"
-    }
-
-    # Prepare parcels data
-    parcels = [{
-        "description": item_data.get('description', doc.description_of_content),
-        "box_type": doc.shipment_type,
-        "quantity": receiver_row.count,
-        "weight": {
-            "value": receiver_row.weight,
-            "unit": "kg"
-        },
-        "dimension": {
-            "width": receiver_row.width,
-            "height": receiver_row.height,
-            "length": receiver_row.lengths,
-            "unit": "cm"
-        },
-        "items": [{
-            "description": item_data.get('description', doc.description_of_content),
-            "origin_country": pickup_country_code,
-            "quantity": receiver_row.count,
-            "price": {
-                "amount": doc.value_of_goods,
-                "currency": "INR"
-            },
-            "weight": {
-                "value": receiver_row.weight,
-                "unit": "kg"
-            }
-        }]
-    }]
-
-    data = {
-        "billing": {
-            "paid_by": "shipper"
-        },
-        "vendor_id": service_data.get('vendor_id'),
-        "description": service_data.get('description'),
-        "slug": service_data.get('slug'),
-        "purpose": doc.kly_purpose,
-        "order_source": "erpnext",
-        "is_document": False,
-        "parcel_contents": doc.description_of_content,
-        "service_type": service_data.get('selected_service_type'),
-        "charged_weight": {
-            "unit": "KG",
-            "value": receiver_row.weight
-        },
-        "customer_reference": f"{doc.name}-{receiver_idx}",
-        "invoice_number": " ",
-        "invoice_date": " ",
-        "is_reverse": False,
-        "is_cod": False,
-        "collect_on_delivery": {"amount": 0, "currency": "INR"},
-        "shipment": {
-            "ship_from": {
-                "contact_name": doc.pickup_contact_person,
-                "company_name": doc.company,
-                "street1": pickup_address.address_line1,
-                "street2": pickup_address.address_line2,
-                "city": pickup_address.city,
-                "state": pickup_address.state,
-                "postal_code": pickup_address.pincode,
-                "phone": pickup_address.phone,
-                "email": pickup_address.email_id,
-                "country": pickup_country_code,
-                "type": doc.kly_pickup_type
-            },
-            "ship_to": {
-                "contact_name": receiver_row.receiver_name,
-                "company_name": receiver_row.receiver_name,
-                "street1": delivery_address.address_line1,
-                "street2": delivery_address.address_line2,
-                "city": delivery_address.city,
-                "state": delivery_address.state,
-                "postal_code": delivery_address.pincode,
-                "phone": delivery_address.phone,
-                "email": delivery_address.email_id,
-                "country": delivery_country_code,
-                "type": doc.kly_delivery_type
-            },
-            "return_to": {
-                "contact_name": doc.pickup_contact_person,
-                "company_name": doc.company,
-                "street1": pickup_address.address_line1,
-                "street2": pickup_address.address_line2,
-                "city": pickup_address.city,
-                "state": pickup_address.state,
-                "postal_code": pickup_address.pincode,
-                "phone": pickup_address.phone,
-                "email": pickup_address.email_id,
-                "country": pickup_country_code,
-                "type": doc.kly_pickup_type
-            },
-            "is_to_pay": False,
-            "parcels": parcels
-        }
-    }
-
-    response = requests.post(url, headers=headers, json=data)
-
-    if response.status_code == 200:
-        result = response.json()
-        if 'files' in result.get('data', {}):
-            label_url = result['data']['files']['label']['label_meta']['url']
-            awb_number = result['data']['files']['label']['label_meta']['awb']
-            service_provider = result['data']['slug']
-            shipment_id = result['data']['order_id']
-            tracking_status_info = result['data']['status']
-            carrier_service = result['data']['service_type']
-
-            return {
-                'status': 'Success',
-                'awb_number': awb_number,
-                'service_provider': service_provider,
-                'tracking_url': label_url,
-                'shipment_id': shipment_id,
-                'tracking_status': 'In Progress',
-                'tracking_status_info': tracking_status_info,
-                'carrier_service': carrier_service
-            }
-        else:
-            frappe.log_error(f"{result['meta']['message']} for {receiver_row.receiver_name}")
-            frappe.throw(f"{result['meta']['details']}")
-    else:
-        error_msg = response.json().get("msg", response.text)
-        frappe.log_error(f"API Failed for {receiver_row.receiver_name} with {response.status_code}: {error_msg}")
-        frappe.throw(f"API request failed with status {response.status_code}: {error_msg}")
 
 
 @frappe.whitelist()
@@ -1185,3 +947,372 @@ def cancel_shipment(docname, shipments_to_cancel=None):
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Shipment Cancellation Error")
         frappe.throw(f"Error cancelling shipment: {str(e)}")
+
+
+def enqueue_bulk_log_update(custom_shipment_name):
+    frappe.enqueue(
+        method="erpnext_eshipz.erpnext_eshipz.doctype.custom_shipment.custom_shipment.process_bulk_shipment_log",
+        queue='long',
+        timeout=600,
+        is_async=True,
+        custom_shipment_name=custom_shipment_name
+    )
+
+def process_bulk_shipment_log(custom_shipment_name):
+    doc = frappe.get_doc("Custom Shipment", custom_shipment_name)
+
+    for row in doc.receiver_details:
+        log = frappe.new_doc("Bulk Shipment Log")
+        log.parent_doctype_name = doc.name
+        log.child_table_row = row.name
+
+        # Copy matching fields from child table to log
+        for field in [
+            "receiver_party_type", "receiver_name", "address", "lengths", "width",
+            "height", "weight", "count", "service_provider", "shipment_id",
+            "shipment_amount", "status", "tracking_url", "carrier", "carrier_service",
+            "awb_number", "tracking_status", "tracking_status_info", "last_update_received",
+            "latest_location", "expected_delivery_date", "delivery_date"
+        ]:
+            if hasattr(row, field):
+                setattr(log, field, getattr(row, field, None))
+
+        log.insert(ignore_permissions=True)
+
+    frappe.db.commit()
+
+
+@frappe.whitelist()
+def bg_log(doc, method):
+    if doc.type == "Bulk Shipment":
+        enqueue_bulk_log_update(doc.name)
+
+
+@frappe.whitelist()
+def create_bulk_shipment(docname, shipments_data):
+    """
+    Create shipments for multiple receivers from Bulk Shipment Log
+    and update both Bulk Shipment Log and Custom Shipment
+    """
+    try:
+        shipments_data = json.loads(shipments_data)
+        
+        # Enqueue the job for background processing
+        frappe.enqueue(
+            "erpnext_eshipz.erpnext_eshipz.doctype.custom_shipment.custom_shipment._enqueue_bulk_shipment_creation",
+            docname=docname,
+            shipments_data=shipments_data,
+            timeout=600,
+            now=False  # Process in background
+        )
+        
+        return {
+            'status': 'Queued',
+            'message': 'Shipment creation has been queued for background processing'
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Bulk shipment queue failed for {docname}")
+        frappe.db.rollback()
+        return {
+            'status': 'Failed',
+            'error': str(e)
+        }
+
+def _enqueue_bulk_shipment_creation(docname, shipments_data):
+    """
+    Background job to process bulk shipments
+    """
+    custom_shipment = frappe.get_doc("Custom Shipment", docname)
+    results = []
+    
+    try:
+        for shipment in shipments_data:
+            child_name = shipment.get('child_name')
+            receiver_name = shipment.get('receiver_name')
+            service_data = shipment.get('service_data')
+            item_data = shipment.get('item_data', {})
+            
+            try:
+                # Generate the Bulk Shipment Log name
+                log_name = f"{docname}-{child_name}"
+                
+                # Create the shipment
+                shipment_result = create_single_shipment(
+                    docname=docname,
+                    log_name=log_name,
+                    child_name=child_name,
+                    receiver_name=receiver_name,
+                    service_data=service_data,
+                    item_data=item_data,
+                    custom_shipment=custom_shipment
+                )
+                
+                # Update the Bulk Shipment Log
+                update_bulk_shipment_log(log_name, shipment_result)
+                
+                # Update the corresponding Custom Shipment receiver row
+                update_custom_shipment_receiver(
+                    docname=docname,
+                    child_name=child_name,
+                    shipment_result=shipment_result
+                )
+                
+                results.append({
+                    'parent_doctype_name': docname,
+                    'child_table_row': child_name,
+                    'receiver_name': receiver_name,
+                    'name': log_name,
+                    'status': shipment_result.get('status', 'Failed'),
+                    'awb_number': shipment_result.get('awb_number'),
+                    'service_provider': shipment_result.get('service_provider'),
+                    'tracking_url': shipment_result.get('tracking_url'),
+                    'error': shipment_result.get('error')
+                })
+                
+            except Exception as e:
+                error_msg = str(e)
+                frappe.log_error(f"(child: {child_name}) - {error_msg}")
+                results.append({
+                    'child_name': child_name,
+                    'receiver_name': receiver_name,
+                    'status': 'Failed',
+                    'error': error_msg
+                })
+        
+        frappe.db.commit()
+        
+    except Exception as e:
+        frappe.log_error(f"Bulk shipment creation failed for {docname}")
+        frappe.db.rollback()
+        raise e
+
+def create_bulk_log(docname, log_name, child_name, receiver_name, service_data, item_data):
+    """
+    Create a new Bulk Shipment Log record with the specified name
+    """
+    bulk_log = frappe.new_doc("Bulk Shipment Log")
+    bulk_log.name = log_name
+    bulk_log.custom_shipment = docname
+    bulk_log.child_name = child_name
+    bulk_log.receiver_name = receiver_name
+    bulk_log.status = "Pending"
+    
+    # Set service provider info
+    if service_data:
+        bulk_log.service_provider = service_data.get('description')
+        bulk_log.carrier_service = service_data.get('selected_service_type')
+        bulk_log.service_slug = service_data.get('slug')
+    
+    # Set item details
+    if item_data:
+        bulk_log.description = item_data.get('description')
+        bulk_log.weight = item_data.get('weight', 0)
+        dimensions = item_data.get('dimensions', {})
+        bulk_log.width = dimensions.get('width', 0)
+        bulk_log.height = dimensions.get('height', 0)
+        bulk_log.lengths = dimensions.get('length', 0)
+        bulk_log.count = dimensions.get('quantity', 1)
+    
+    bulk_log.insert(ignore_permissions=True)
+    return bulk_log
+
+def update_bulk_shipment_log(bulk_log, shipment_result):
+    """
+    Update Bulk Shipment Log with shipment details
+    """
+    # If bulk_log is a string (docname), get the document first
+    if isinstance(bulk_log, str):
+        bulk_log = frappe.get_doc("Bulk Shipment Log", bulk_log)
+    
+    if shipment_result.get('status') == 'Success':
+        bulk_log.update({
+            'awb_number': shipment_result.get('awb_number'),
+            'service_provider': shipment_result.get('service_provider'),
+            'tracking_url': shipment_result.get('tracking_url'),
+            'status': 'Booked',
+            'shipment_id': shipment_result.get('shipment_id'),
+            'tracking_status': shipment_result.get('tracking_status', 'In Progress'),
+            'tracking_status_info': shipment_result.get('tracking_status_info'),
+            'carrier_service': shipment_result.get('carrier_service')
+        })
+        bulk_log.save()
+
+def update_custom_shipment_receiver(docname, child_name, shipment_result):
+    """
+    Update the receiver row in Custom Shipment with shipment details
+    """
+    doc = frappe.get_doc("Custom Shipment", docname)
+    
+    for row in doc.receiver_details:
+        if row.name == child_name:
+            row.update({
+                'awb_number': shipment_result.get('awb_number'),
+                'service_provider': shipment_result.get('service_provider'),
+                'tracking_url': shipment_result.get('tracking_url'),
+                'status': 'Booked',
+                'shipment_id': shipment_result.get('shipment_id'),
+                'tracking_status': shipment_result.get('tracking_status', 'In Progress'),
+                'tracking_status_info': shipment_result.get('tracking_status_info'),
+                'carrier_service': shipment_result.get('carrier_service')
+            })
+            doc.save()
+            break
+
+@frappe.whitelist()
+def create_single_shipment(docname, log_name, child_name, receiver_name, service_data, item_data, custom_shipment=None):
+    """
+    Create a single shipment using data from Bulk Shipment Log
+    """
+    if not custom_shipment:
+        custom_shipment = frappe.get_doc("Custom Shipment", docname)
+    
+    # Get pickup address from Custom Shipment
+    pickup_address = frappe.db.get_value('Address', custom_shipment.address, 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        as_dict=1)
+    
+    def get_country_code(country_name):
+        country = frappe.get_doc('Country', country_name)
+        return country.code.upper()
+
+    pickup_country_code = get_country_code(pickup_address.country)
+    delivery_country_code = pickup_country_code  # Assuming same country for delivery
+    
+    api_token = frappe.db.get_single_value('eShipz Settings', 'api_token')
+    if not api_token:
+        frappe.throw("API token not found in eShipz Settings")
+
+    url = "https://app.eshipz.com/api/v1/create-shipments"
+    headers = {
+        "X-API-TOKEN": api_token,
+        "Content-Type": "application/json"
+    }
+
+    # Prepare parcels data using item_data
+    parcels = [{
+        "description": item_data.get('description', custom_shipment.description_of_content),
+        "box_type": custom_shipment.shipment_type,
+        "quantity": item_data.get('dimensions', {}).get('quantity', 1),
+        "weight": {
+            "value": item_data.get('weight', 0),
+            "unit": "kg"
+        },
+        "dimension": {
+            "width": item_data.get('dimensions', {}).get('width', 0),
+            "height": item_data.get('dimensions', {}).get('height', 0),
+            "length": item_data.get('dimensions', {}).get('length', 0),
+            "unit": "cm"
+        },
+        "items": [{
+            "description": item_data.get('description', custom_shipment.description_of_content),
+            "origin_country": pickup_country_code,
+            "quantity": item_data.get('dimensions', {}).get('quantity', 1),
+            "price": {
+                "amount": custom_shipment.value_of_goods,
+                "currency": "INR"
+            },
+            "weight": {
+                "value": item_data.get('weight', 0),
+                "unit": "kg"
+            }
+        }]
+    }]
+
+    data = {
+        "billing": {
+            "paid_by": "shipper"
+        },
+        "vendor_id": service_data.get('vendor_id'),
+        "description": service_data.get('description'),
+        "slug": service_data.get('slug'),
+        "purpose": custom_shipment.kly_purpose,
+        "order_source": "erpnext",
+        "is_document": False,
+        "parcel_contents": custom_shipment.description_of_content,
+        "service_type": service_data.get('selected_service_type'),
+        "charged_weight": {
+            "unit": "KG",
+            "value": item_data.get('weight', 0)
+        },
+        "customer_reference": log_name,
+        "invoice_number": " ",
+        "invoice_date": " ",
+        "is_reverse": False,
+        "is_cod": False,
+        "collect_on_delivery": {"amount": 0, "currency": "INR"},
+        "shipment": {
+            "ship_from": {
+                "contact_name": custom_shipment.pickup_contact_person,
+                "company_name": custom_shipment.company,
+                "street1": pickup_address.address_line1,
+                "street2": pickup_address.address_line2,
+                "city": pickup_address.city,
+                "state": pickup_address.state,
+                "postal_code": pickup_address.pincode,
+                "phone": pickup_address.phone,
+                "email": pickup_address.email_id,
+                "country": pickup_country_code,
+                "type": custom_shipment.kly_pickup_type
+            },
+            "ship_to": {
+                "contact_name": receiver_name,
+                "company_name": receiver_name,
+                "street1": pickup_address.address_line1,
+                "street2": pickup_address.address_line2,
+                "city": pickup_address.city,
+                "state": pickup_address.state,
+                "postal_code": pickup_address.pincode,
+                "phone": pickup_address.phone,
+                "email": pickup_address.email_id,
+                "country": delivery_country_code,
+                "type": custom_shipment.kly_delivery_type
+            },
+            "return_to": {
+                "contact_name": custom_shipment.pickup_contact_person,
+                "company_name": custom_shipment.company,
+                "street1": pickup_address.address_line1,
+                "street2": pickup_address.address_line2,
+                "city": pickup_address.city,
+                "state": pickup_address.state,
+                "postal_code": pickup_address.pincode,
+                "phone": pickup_address.phone,
+                "email": pickup_address.email_id,
+                "country": pickup_country_code,
+                "type": custom_shipment.kly_pickup_type
+            },
+            "is_to_pay": False,
+            "parcels": parcels
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        result = response.json()
+        if 'files' in result.get('data', {}):
+            label_url = result['data']['files']['label']['label_meta']['url']
+            awb_number = result['data']['files']['label']['label_meta']['awb']
+            service_provider = result['data']['slug']
+            shipment_id = result['data']['order_id']
+            tracking_status_info = result['data']['status']
+            carrier_service = result['data']['service_type']
+
+            return {
+                'status': 'Success',
+                'awb_number': awb_number,
+                'service_provider': service_provider,
+                'tracking_url': label_url,
+                'shipment_id': shipment_id,
+                'tracking_status': 'In Progress',
+                'tracking_status_info': tracking_status_info,
+                'carrier_service': carrier_service
+            }
+        else:
+            error_msg = result.get('meta', {}).get('message', 'Unknown error')
+            frappe.log_error(f"{error_msg} for {receiver_name}")
+            frappe.throw(error_msg)
+    else:
+        error_msg = response.json().get("msg", response.text)
+        frappe.log_error(f"API Failed with {error_msg}")
+        frappe.throw(f"API request failed with status {response.status_code}: {error_msg}")

@@ -126,11 +126,23 @@ frappe.ui.form.on("Custom Shipment", {
             });
 
             frm.set_df_property("sub_filter", "options", options.join("\n"));
+            frm.set_df_property("sub_filter_2", "options", options.join("\n"));
+            frm.set_df_property("sub_filter_3", "options", options.join("\n"));
             frm.refresh_field("sub_filter");
+            frm.refresh_field("sub_filter_2");
+            frm.refresh_field("sub_filter_3");
 
             frm.set_value("sub_filter", null);
             frm.set_value("dynamic_link_ref", null);
             frm.set_value("value", null);
+
+            frm.set_value("sub_filter_2", null);
+            frm.set_value("dynamic_link_ref_2", null);
+            frm.set_value("value_2", null);
+
+            frm.set_value("sub_filter_3", null);
+            frm.set_value("dynamic_link_ref_3", null);
+            frm.set_value("value_3", null);
         });
     },
 
@@ -151,76 +163,113 @@ frappe.ui.form.on("Custom Shipment", {
         frm.refresh_field("value");
     },
 
-    // Fetch and populate receiver_details based on filters
-    apply_filter: function(frm) {
-    const { filter_doctype, sub_filter, value } = frm.doc;
+    sub_filter_2: function (frm) {
+        const selected_label = frm.doc.sub_filter_2;
+        const fieldname = frm.__link_field_map?.[selected_label];
+
+        if (!fieldname) {
+            frm.set_value("dynamic_link_ref_2", null);
+            frm.set_value("value_2", null);
+            return;
+        }
+
+        const link_target_doctype = frm.__link_field_map[fieldname];
+        frm.set_value("dynamic_link_ref_2", link_target_doctype);
+        frm.set_value("value_2", null);
+        frm.refresh_field("value_2");
+    },
+
+    sub_filter_3: function (frm) {
+        const selected_label = frm.doc.sub_filter_3;
+        const fieldname = frm.__link_field_map?.[selected_label];
+
+        if (!fieldname) {
+            frm.set_value("dynamic_link_ref_3", null);
+            frm.set_value("value_3", null);
+            return;
+        }
+
+        const link_target_doctype = frm.__link_field_map[fieldname];
+        frm.set_value("dynamic_link_ref_3", link_target_doctype);
+        frm.set_value("value_3", null);
+        frm.refresh_field("value_3");
+    },
+
+apply_filter: function(frm) {
+    const { filter_doctype, sub_filter, value, sub_filter_2, value_2, sub_filter_3, value_3 } = frm.doc;
 
     if (!filter_doctype) {
         frappe.msgprint("Please select Filter Doctype.");
         return;
     }
 
-    // Build filters
+    // Build filters object
     const filters = {};
     const fieldname = frm.__link_field_map?.[sub_filter];
+    const fieldname2 = frm.__link_field_map?.[sub_filter_2];
+    const fieldname3 = frm.__link_field_map?.[sub_filter_3];
     
     if (sub_filter && value && fieldname) {
         filters[fieldname] = value;
     }
+    
+    if (sub_filter_2 && value_2 && fieldname2) {
+        filters[fieldname2] = value_2;
+    }
+    
+    if (sub_filter_3 && value_3 && fieldname3) {
+        filters[fieldname3] = value_3;
+    }
 
-    // Single optimized call to backend
     frappe.call({
         method: 'erpnext_eshipz.erpnext_eshipz.doctype.custom_shipment.custom_shipment.get_filtered_records_with_addresses',
-        args: {
+        args: { 
             doctype: filter_doctype,
             filters: filters
         },
         freeze: true,
-        freeze_message: __('Fetching records...'),
         callback: function(response) {
             if (response.message) {
                 process_records(frm, response.message);
             } else {
                 frappe.msgprint(__('No records found matching the criteria'));
             }
-        },
-        error: function() {
-            frappe.msgprint(__('Failed to fetch records'));
         }
     });
     
     function process_records(frm, records) {
         frm.clear_table("receiver_details");
-
-        records.forEach(row => {
+        
+        records.forEach(record => {
+            // Use primary address if available, otherwise first address
+            const address = record.addresses.find(a => a.is_primary_address) || 
+                          (record.addresses.length > 0 ? record.addresses[0] : null);
+            
+            // Use primary contact if available, otherwise first contact
+            const contact = record.contacts.find(c => c.is_primary_contact) || 
+                         (record.contacts.length > 0 ? record.contacts[0] : null);
+            
             const child = frm.add_child("receiver_details");
             child.receiver_party_type = frm.doc.filter_doctype;
-            child.receiver_name = row.name;
+            child.receiver_name = record.name;
             
-            // Add address details if available
-            if (row.address) {
-                child.address = row.address.name;
-                child.address_line_1 = row.address.address_line1;
-                child.address_line_2 = row.address.address_line2;
-                child.city = row.address.city;
-                child.state = row.address.state;
-                child.postal_code = row.address.pincode;
-                child.country = row.address.country;
+            if (address) {
+                child.address = address.name;
+                child.address_line_1 = address.address_line1;
+                child.address_line_2 = address.address_line2;
+                child.city = address.city;
+                child.state = address.state;
+                child.postal_code = address.pincode;
+                child.country = address.country;
             }
             
-            // Add contact details if available
-            if (row.contact) {
-                child.receiver_contact = row.contact.phone || row.contact.mobile_no;
-                child.receiver_email = row.contact.email_id;
+            if (contact) {
+                child.receiver_contact = contact.phone;
+                child.receiver_email = contact.email_id;
             }
         });
 
         frm.refresh_field("receiver_details");
-
-        const btn = frm.page.inner_toolbar.find('.btn-add-parcel-template');
-        if (btn) {
-            btn.prop('disabled', records.length === 0);
-        }
     }
 },
 
@@ -1174,6 +1223,7 @@ function process_shipment_creation(selected_services) {
     let shipments_data = selected_services.map(service => {
         let receiver_row = cur_frm.doc.receiver_details.find(r => r.idx == service.receiver_idx);
         return {
+            child_name: receiver_row.name,
             receiver_idx: service.receiver_idx,
             receiver_name: service.receiver_name,
             service_data: service.service,
