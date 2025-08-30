@@ -128,7 +128,7 @@ def get_filtered_records_with_addresses(doctype, filters):
 def fetch_available_services(docname):
     doc = frappe.get_doc('Custom Shipment', docname)
     pickup_address = frappe.db.get_value('Address', doc.address, 
-        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id', 'gstin'], 
         as_dict=1)
     
     def get_country_code(country_name):
@@ -257,7 +257,7 @@ def fetch_available_services(docname):
 def fetch_single_available_services(docname):
     doc = frappe.get_doc('Custom Shipment', docname)
     pickup_address = frappe.db.get_value('Address', doc.address, 
-        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id', 'gstin'], 
         as_dict=1)
     
     def get_country_code(country_name):
@@ -383,7 +383,7 @@ def create_shipment(docname, selected_service, item_data=None):
         item_data = json.loads(item_data)
 
     pickup_address = frappe.db.get_value('Address', doc.address,
-        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id', 'gstin'], 
         as_dict=1)
     
     def get_country_code(country_name):
@@ -519,7 +519,7 @@ def create_shipment(docname, selected_service, item_data=None):
     }
 
     json_data = json.dumps(data, separators=(',', ':'), default=lambda x: str(x).lower() if isinstance(x, bool) else x)
-
+    frappe.errprint("JSON Data: " + json_data)  # Debugging line to print JSON data
     response = requests.post(url, headers=headers, data=json_data)
 
     if response.status_code == 200:
@@ -1169,7 +1169,7 @@ def create_single_shipment(docname, log_name, child_name, receiver_name, service
     
     # Get pickup address from Custom Shipment
     pickup_address = frappe.db.get_value('Address', custom_shipment.address, 
-        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id'], 
+        ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country', 'phone', 'email_id', 'gstin'], 
         as_dict=1)
     
     def get_country_code(country_name):
