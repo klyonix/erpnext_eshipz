@@ -153,7 +153,7 @@ doctype_js = {
 # }
 doc_events = {
     "Sales Invoice": {
-        "before_submit": "erpnext_eshipz.erpnext_eshipz.custom.sales_invoice.sales_invoice.update_delivery_note"
+        "after_submit": "erpnext_eshipz.erpnext_eshipz.custom.sales_invoice.sales_invoice.update_delivery_note"
     },
     "Custom Shipment":
     {
