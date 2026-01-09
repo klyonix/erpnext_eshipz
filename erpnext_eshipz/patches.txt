@@ -6,7 +6,7 @@
 # Patches added in this section will be executed after doctypes are migrated
 
 
-erpnext_eshipz.erpnext_eshipz.patches.shipment_delivery_note 
-erpnext_eshipz.erpnext_eshipz.patches.shipment #2
-erpnext_eshipz.erpnext_eshipz.patches.shipment_autoname
-erpnext_eshipz.erpnext_eshipz.patches.employee
+erpnext_eshipz.erpnext_eshipz.patches.shipment_delivery_note #1
+erpnext_eshipz.erpnext_eshipz.patches.shipment #3
+erpnext_eshipz.erpnext_eshipz.patches.shipment_autoname #1
+erpnext_eshipz.erpnext_eshipz.patches.employee #1
